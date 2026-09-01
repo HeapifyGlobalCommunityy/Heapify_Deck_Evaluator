@@ -62,6 +62,37 @@ def test_zero_assessed_suppresses_score_without_dividing_by_zero():
     assert report.coverage == 0.0
 
 
+def test_suppressed_score_has_no_number():
+    axes = [_scored(axis, 8) for axis in SIX_AXES[:2]] + [
+        _cannot_assess(axis) for axis in SIX_AXES[2:]
+    ]
+    report = build_report(axes, EQUAL_WEIGHTS, [])
+    assert report.coverage < 0.60
+    assert report.coverage == pytest.approx(2 / 6)
+    assert report.score is None
+    assert report.score != 0.0
+    assert len(report.axes) == 6
+    assert len([axis for axis in report.axes if isinstance(axis, ScoredAxis)]) == 2
+    assert len([axis for axis in report.axes if isinstance(axis, CannotAssessAxis)]) == 4
+
+
+def test_unequal_weights_renormalises_over_assessed_axes_only():
+    axes = [_scored(SIX_AXES[0], 10)] + [
+        _scored(axis, 6) for axis in SIX_AXES[1:4]
+    ] + [_cannot_assess(axis) for axis in SIX_AXES[4:]]
+    weights = dict(EQUAL_WEIGHTS)
+    weights[SIX_AXES[0]] = 3.0
+    weights[SIX_AXES[4]] = 99.0
+    weights[SIX_AXES[5]] = 99.0
+
+    report = build_report(axes, weights, [])
+
+    # Assessed only: (3*10 + 1*6 + 1*6 + 1*6) / (3*10 + 1*10 + 1*10 + 1*10) * 100
+    assert report.score == pytest.approx(80.0)
+    # Equal weights on the same four assessed axes would renormalise to 70.0.
+    assert build_report(axes, EQUAL_WEIGHTS, []).score == pytest.approx(70.0)
+
+
 def test_suppressed_score_still_keeps_both_suggestions():
     axes = [_scored(axis, 7) for axis in SIX_AXES[:3]] + [
         _cannot_assess(axis) for axis in SIX_AXES[3:]
